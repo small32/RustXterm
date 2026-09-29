@@ -1,0 +1,30 @@
+[package]
+name = "moba-rust"
+version = "0.1.0"
+description = "MobaRust — MobaXterm 风格终端（Rust + Tauri 2）"
+authors = ["you"]
+edition = "2021"
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+name = "moba_rust_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# macos-private-api：配合 tauri.conf.json 的 app.macOSPrivateApi，
+# 用于透明/Overlay 标题栏（交通灯浮于内容上）。详见 pixel-spec.md 第 8 节。
+tauri = { version = "2", features = ["macos-private-api"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true

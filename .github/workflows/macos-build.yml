@@ -1,0 +1,139 @@
+name: macOS build
+
+# 说明：
+# - 本流水线只在 macOS runner 上跑。macOS 产物（.app/.dmg/universal binary）
+#   无法在 Windows 上交叉构建，详见项目讨论结论。
+# - 当前为「未签名构建」，用于验证产物能正常打出；签名与公证见文件末尾的注释块。
+# - 注意：macOS runner 计费倍率高于 Linux，私有仓库请按需触发。
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  verify:
+    name: 编译校验（前端 build + cargo check）
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: moba-rust
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: moba-rust/package-lock.json
+
+      - name: 安装 Rust 工具链与 macOS 目标
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: 缓存 Rust 依赖
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: moba-rust/src-tauri
+
+      - name: 安装前端依赖
+        run: npm ci
+
+      - name: 前端构建
+        run: npm run build
+
+      - name: Rust 编译校验（macOS arm64）
+        run: cargo check --manifest-path src-tauri/Cargo.toml --target aarch64-apple-darwin
+
+  bundle:
+    name: 打包 .app + .dmg（universal）
+    needs: verify
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: moba-rust
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: moba-rust/package-lock.json
+
+      - name: 安装 Rust 工具链与 macOS 目标
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: 缓存 Rust 依赖
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: moba-rust/src-tauri
+
+      - name: 安装前端依赖
+        run: npm ci
+
+      - name: 打包（universal，未签名）
+        run: npx tauri build --target universal-apple-darwin
+
+      - name: 列出 bundle 产物
+        run: find src-tauri/target/universal-apple-darwin/release/bundle -maxdepth 2
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: MobaRust-macos-universal
+          # 注意：upload-artifact 的 path 相对仓库根目录解析，
+          # 不受上面 defaults.run.working-directory 影响，故需带 moba-rust/ 前缀。
+          path: |
+            moba-rust/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+            moba-rust/src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app
+          if-no-files-found: error
+          retention-days: 14
+
+# ---------------------------------------------------------------------------
+# 签名与公证（Phase 6 启用）
+#
+# 需要先在仓库 Settings → Secrets and variables → Actions 里配置：
+#   APPLE_CERTIFICATE            : .p12 证书的 base64（certutil -encode 或 openssl base64）
+#   APPLE_CERTIFICATE_PASSWORD   : .p12 导出密码
+#   APPLE_SIGNING_IDENTITY       : 形如 "Developer ID Application: NAME (TEAMID)"
+#   APPLE_ID                     : 公证用的 Apple ID
+#   APPLE_PASSWORD               : Apple ID 的 app-specific password
+#   APPLE_TEAM_ID                : 团队 ID
+#
+# 然后在 bundle job 的「打包」步骤前插入：
+#
+#      - name: 导入签名证书
+#        env:
+#          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+#          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+#        run: |
+#          echo "$APPLE_CERTIFICATE" | base64 --decode > /tmp/cert.p12
+#          security create-keychain -p "" build.keychain
+#          security default-keychain -s build.keychain
+#          security unlock-keychain -p "" build.keychain
+#          security import /tmp/cert.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+#          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+#          rm /tmp/cert.p12
+#
+# 并把「打包」步骤的 env 补成：
+#          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+#          APPLE_ID: ${{ secrets.APPLE_ID }}
+#          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+#          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+# ---------------------------------------------------------------------------
