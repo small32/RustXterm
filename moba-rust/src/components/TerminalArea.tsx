@@ -2,7 +2,13 @@
 // 静态渲染 htop 输出。列布局按 ref 实测像素绝对定位（各列右缘 px，相对内容区左 244）：
 // PID 61 / USER 左 69 / PRI 181 / NI 212 / VIRT 261 / RES 309 / SHR 357 / S 372 /
 // CPU 420 / MEM 461 / TIME 532 / cmd 左 541。字体 Cascadia Mono 14（advance≈8，同 ref）。
-// Phase 2 将替换为 xterm.js 实例。
+// Phase 2 运行时分流：Tauri 环境 → XtermPane（真实 PTY）；纯浏览器(vite preview) → 保留静态 htop，
+// 以维持 Phase 1 像素验收基线。
+import XtermPane from "./XtermPane";
+
+// Tauri 2 可靠检测（`__TAURI_INTERNALS__` 仅在 Tauri webview 注入；vite preview 无）
+const hasTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+
 const BRIGHT = "#ececec";
 const CYAN = "#54ccef"; // 高亮底 / CPU% 底
 const CYAN_TEXT = "#3bbbef"; // info 行文本青
@@ -170,6 +176,12 @@ const fkeys: [string, number, string, number][] = [
 ];
 
 export default function TerminalArea() {
+  // Tauri 环境 → 真实终端；else → 静态 htop（浏览器预览/验收基线）
+  if (hasTauri) return <XtermPane />;
+  return <StaticHtop />;
+}
+
+function StaticHtop() {
   return (
     <div
       className="relative flex min-h-0 flex-1 flex-col overflow-hidden pt-[5px] text-[14.5px]"
