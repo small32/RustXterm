@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# 像素叠图验收产物（大截图，不入库）
+.visual-diff/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

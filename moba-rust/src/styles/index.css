@@ -1,3 +1,63 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ============================================================
+ * Design Tokens —— 唯一颜色来源，取值全部来自 pixel-spec.md 实测
+ * 深色套 = 基准（默认）；浅色套 = §9.2 实测值
+ * 组件中禁止写死颜色，一律 var(--xxx)
+ * ============================================================ */
+:root,
+[data-theme="dark"] {
+  /* 背景 */
+  --bg-titlebar: #202020; /* 原生标题栏让位区（截图标题栏实测） */
+  --bg-main: #202020; /* 主内容区底 */
+  --bg-chrome: #141414; /* 工具栏 / 标签栏 / 侧栏 / 功能键栏 */
+  --bg-terminal: #1c1c1c; /* 终端底 */
+  --bg-tab-active: #545454; /* 活动标签底 */
+  --fill-button: #323232; /* 按钮填充 / 分隔条 */
+
+  /* 边框 */
+  --border: #6a6a6a; /* 边框线 / 弱文字 */
+  --border-tab: #6a6a6a; /* 标签栏下边框 */
+  --border-search: #dadada; /* 搜索框边框 */
+
+  /* 文字 */
+  --text-title: #ffffff;
+  --text-main: #d9d9d9;
+  --text-secondary: #909090;
+  --text-toolbar-label: #9f9f9f;
+  --text-tree: #b9b9b9;
+}
+
+[data-theme="light"] {
+  --bg-titlebar: #f3f3f3;
+  --bg-main: #ffffff;
+  --bg-chrome: #ffffff;
+  --bg-terminal: #1c1c1c; /* 两套相同 */
+  --bg-tab-active: #eaeaea;
+  --fill-button: #f0f0f0;
+
+  --border: #b4b4b4;
+  --border-tab: #8b99a8;
+  --border-search: #b4b4b4; /* 未实测到，暂用按钮边框色占位（pixel-spec §7） */
+
+  --text-title: #333333;
+  --text-main: #333333;
+  --text-secondary: #878787;
+  --text-toolbar-label: #646464;
+  --text-tree: #333333;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
